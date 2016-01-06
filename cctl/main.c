@@ -83,7 +83,7 @@ struct cc_dma_channel
 void flash_erase_page(void)
 {
   while (FCTL & FCTL_BUSY);
-  
+
   FWT = FLASH_FWT;
   FADDRH = page << 1;
   FADDRL = 0x00;
@@ -91,7 +91,7 @@ void flash_erase_page(void)
   // Erase the page that will be written to
   FCTL |=  FCTL_ERASE;
   __asm nop __endasm;
-  
+
   // Wait for the erase operation to complete
   while (FCTL & FCTL_BUSY) {}
 }
@@ -100,14 +100,14 @@ void flash_write_trigger(void)
 {
   // Enable flash write. Generates a DMA trigger. Must be aligned on a 2-byte
   // boundary and is therefore implemented in assembly.
-  
+
   // p.s. if this looks a little crazy its because it is, sdcc doesn't currently
   // support explicitly specifying code alignment which would make this easier
-  
+
   __asm
     .globl flash_write_trigger_instruction
     .globl flash_write_trigger_done
-    
+
     ; Put our trigger instruction in the HOME segment (shared with some startup code)
     ; where it wont move around too much
     .area HOME (CODE)
@@ -117,7 +117,7 @@ void flash_write_trigger(void)
     orl _FCTL, #0x02  ; FCTL |=  FCTL_ERASE
     nop               ; Required, see datasheet.
     ljmp flash_write_trigger_done ; Jump back into our function
-    
+
     ; Meanwhile, back in the main CSEG segment...
     .area CSEG (CODE)
     ; Jump to the trigger instruction
@@ -136,17 +136,17 @@ void flash_write(void)
   dma0_config.len_high  = DMA_LEN_HIGH_VLEN_LEN;
   dma0_config.len_high |= ((1024) >> 8) & DMA_LEN_HIGH_MASK;
   dma0_config.len_low   = (1024) & 0x00FF;
-  
+
   dma0_config.cfg0 = \
     DMA_CFG0_WORDSIZE_8 | \
     DMA_CFG0_TMODE_SINGLE | \
     DMA_CFG0_TRIGGER_FLASH;
-  
+
   dma0_config.cfg1 = \
     DMA_CFG1_SRCINC_1 | \
     DMA_CFG1_DESTINC_0 | \
     DMA_CFG1_PRIORITY_HIGH;
-  
+
   // Point DMA controller at our DMA descriptor
   DMA0CFGH = ((uint16_t)&dma0_config >> 8) & 0x00FF;
   DMA0CFGL = (uint16_t)&dma0_config & 0x00FF;
@@ -164,13 +164,13 @@ void flash_write(void)
 
   // Enable flash write - triggers the DMA transfer
   flash_write_trigger();
-  
+
   // Wait for DMA transfer to complete
   while (!(DMAIRQ & DMAIRQ_DMAIF0));
 
   // Wait until flash controller not busy
   while (FCTL & (FCTL_BUSY | FCTL_SWBSY));
-  
+
   // By now, the transfer is completed, so the transfer count is reached.
   // The DMA channel 0 interrupt flag is then set, so we clear it here.
   DMAIRQ &= ~DMAIRQ_DMAIF0;
@@ -236,14 +236,13 @@ void bootloader_main(void)
     uint16_t i;
     uint8_t n;
 
-    // Initialise clocks
-    SLEEP &= ~SLEEP_OSC_PD;	// enable RC oscillator
-    while( !(SLEEP & SLEEP_XOSC_S) );	// let oscillator stabilise
-
-    CLKCON = CLKCON_OSC32 | CLKCON_OSC | TICKSPD_DIV_32 | CLKSPD_DIV_2;  // select internal HS RC oscillator
-    while (!(CLKCON & CLKCON_OSC));
-
-    CLKCON = CLKCON_OSC32 | TICKSPD_DIV_32 | CLKSPD_DIV_1;  // select external crystal
+    // subg_rfspy hack - make the clock work the same as subg_rfspy, since our
+    // clock runs at 24Mhz
+    SLEEP &= ~SLEEP_OSC_PD;
+    while( !(SLEEP & SLEEP_XOSC_S) );
+    CLKCON = (CLKCON & ~(CLKCON_CLKSPD | CLKCON_OSC)) | CLKSPD_DIV_1;
+    while (CLKCON & CLKCON_OSC);
+    SLEEP |= SLEEP_OSC_PD;
 
 //    while (CLKCON & CLKCON_OSC);
 //    SLEEP |= SLEEP_OSC_PD;	// Disable RC oscillator now that we have an external crystal
@@ -253,8 +252,11 @@ void bootloader_main(void)
 	PERCFG = (PERCFG & ~PERCFG_U0CFG) | PERCFG_U1CFG;
 	P0SEL |= (1<<3) | (1<<2);
 	U0CSR = 0x80 | 0x40;    // UART, RX on
-	U0BAUD = 34;    // 115200
-	U0GCR = 13; // 115k2 baud at 13MHz, useful for coming out of sleep.  Assumes clkspd_div2 in clkcon for HSRC osc
+
+  // subg_rfspy hack - same settings as subg_rfspy since I know they work
+	U0BAUD = 163;
+	U0GCR = (U0GCR&~0x1F) | 9;
+
 	URX0IF = 0;	// No interrupts pending at start
 	URX0IE = 1;	// Serial Rx irqs enabled in system interrupt register
 
@@ -311,7 +313,7 @@ upgrade_loop:
                         cons_putc(flashp[i]);
                     goto ack;
                 break;
-            
+
                 case 'l':
                     i = 0;
                     while(i<1024)
@@ -334,6 +336,3 @@ upgrade_loop:
         }
     }
 }
-
-
-

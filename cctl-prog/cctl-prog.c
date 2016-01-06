@@ -20,7 +20,7 @@
 #include <windows.h>
 #include <wincon.h>
 #include <time.h>
-#define B115200 115200
+#define B19200 19200
 #endif
 
 #include "hex.h"
@@ -131,7 +131,7 @@ static int enableRawMode(void)
 {
     struct termios raw;
 
-    if (!isatty(STDIN_FILENO)) 
+    if (!isatty(STDIN_FILENO))
         return -1;
 
     if (tcgetattr(STDIN_FILENO,&orig_termios) == -1)
@@ -190,8 +190,8 @@ int serialOpen(char *port)
 #ifndef WIN32
 	fcntl(fd, F_SETFL, 0);
 	tcgetattr(fd, &t_opt);
-	cfsetispeed(&t_opt, B115200);
-	cfsetospeed(&t_opt, B115200);
+	cfsetispeed(&t_opt, B19200);
+	cfsetospeed(&t_opt, B19200);
 	t_opt.c_cflag |= (CLOCAL | CREAD);
     t_opt.c_cflag &= ~PARENB;
 	t_opt.c_cflag &= ~CSTOPB;
@@ -220,7 +220,7 @@ int serialOpen(char *port)
 
 
     dcb.DCBlength = sizeof(dcb);
-    dcb.BaudRate = B115200;
+    dcb.BaudRate = B19200;
     dcb.ByteSize = 8;
     dcb.Parity = NOPARITY;
     dcb.StopBits = ONESTOPBIT;
@@ -505,7 +505,7 @@ int wait_for_bootloader(int fd, int timeout)
             }
 	    else if (opt_wireless)
 	    {
-		if (c == 'W' && prev_c == 'W') 
+		if (c == 'W' && prev_c == 'W')
 		    break;
 	    }
             else
@@ -681,7 +681,7 @@ DWORD CALLBACK SerialRxThread( HANDLE h )
                         fprintf(stderr, "WriteFile failed\n");
                         quit = TRUE;
                     }
-                } 
+                }
             }
         }
     }
@@ -797,7 +797,7 @@ int main(int argc, char *argv[])
     {
         fprintf(stderr, "out of ram\n");
         return 1;
-    }   
+    }
 
     if (0 != parse_options(argc, argv))
     {
@@ -880,5 +880,3 @@ int main(int argc, char *argv[])
 
     return 0;
 }
-
-
